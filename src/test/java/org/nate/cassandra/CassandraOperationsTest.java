@@ -17,51 +17,51 @@ public class CassandraOperationsTest {
 	 * Sorry for the silly.  --Nate
 	 * 
 	 */
-	private CassandraOperations template;
+	private CassandraOperations cassandra;
 	
 	@Before
 	public void setup() {
-		template = new CassandraOperations();
-		template.setKeyspaceName("Keyspace1");
-		template.setHost("localhost");
-		template.setPort(9160);
-		template.setTimeout(1000);
+		cassandra = new CassandraOperations();
+		cassandra.setKeyspaceName("Keyspace1");
+		cassandra.setHost("localhost");
+		cassandra.setPort(9160);
+		cassandra.setTimeout(1000);
 	}
 	
 	@Test
 	public void testA_InsertAndRetrieve() throws Exception {
-		template.insertColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name", "nathan");		
-		String result = template.getColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name");
+		cassandra.insertColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name", "nathan");		
+		String result = cassandra.getColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name");
 		
 		Assert.assertEquals("nathan", result);
 	}
 	
 	@Test
 	public void testB_RetrieveNotExists() throws Exception {
-		String result = template.getColumnValue(STANDARD_1_COLUMN_FAMILY, "1", "name");
+		String result = cassandra.getColumnValue(STANDARD_1_COLUMN_FAMILY, "1", "name");
 		
 		Assert.assertNull("should have NotFoundException", result);	
 	}
 
 	@Test
 	public void testC_Update() throws Exception {
-		template.insertColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name", "dan");
-		String result = template.getColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name");
+		cassandra.insertColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name", "dan");
+		String result = cassandra.getColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name");
 		
 		Assert.assertEquals("dan", result);
 	}
 	
 	@Test
 	public void testD_Count() throws Exception {
-		int countResult = template.count(STANDARD_1_COLUMN_FAMILY, "0");
+		int countResult = cassandra.count(STANDARD_1_COLUMN_FAMILY, "0");
 		
 		Assert.assertEquals(1, countResult);
 	}
 	
 	@Test
 	public void testE_Delete() throws Exception {
-		template.removeColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name");
-		int afterDeleteCount = template.count(STANDARD_1_COLUMN_FAMILY, "0");
+		cassandra.removeColumnValue(STANDARD_1_COLUMN_FAMILY, "0", "name");
+		int afterDeleteCount = cassandra.count(STANDARD_1_COLUMN_FAMILY, "0");
 		
 		Assert.assertEquals(0, afterDeleteCount);
 	}
@@ -70,7 +70,7 @@ public class CassandraOperationsTest {
 	public void testF_InsertObjectNotColumnFamily() {
 		IncorrectlyAnnotatedStandardColumnTestClass failObject = new IncorrectlyAnnotatedStandardColumnTestClass();
 		try {
-			template.insert(IncorrectlyAnnotatedStandardColumnTestClass.class, failObject);
+			cassandra.insert(IncorrectlyAnnotatedStandardColumnTestClass.class, failObject);
 			Assert.fail("CassandraOperationException expected");
 		} catch (Exception e) {
 			Assert.assertTrue(e instanceof CassandraOperationException);
@@ -87,40 +87,49 @@ public class CassandraOperationsTest {
 		testObject.setAStringColumn(value);
 		int intValue = 2;
 		testObject.setAnIntegerColumn(intValue);
-		template.insert(StandardColumnTestClass.class, testObject);
+		testObject.setAnUnannotatedField("unannotated!");
+		cassandra.insert(StandardColumnTestClass.class, testObject);
 		
-		String resultString = template.getColumnValue("Standard1", key, "aStringColumn");
+		String resultString = cassandra.getColumnValue("Standard1", key, "aStringColumn");
 		Assert.assertEquals(value, resultString);
 		
-		StandardColumnTestClass resultObject = (StandardColumnTestClass) template.get(StandardColumnTestClass.class, key);
+		StandardColumnTestClass resultObject = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, key);
 		Assert.assertEquals(key, resultObject.getKey());
 		Assert.assertEquals(value, resultObject.getAStringColumn());
 		Assert.assertEquals(new Integer(intValue), resultObject.getAnIntegerColumn());
+		Assert.assertNull(resultObject.getAnUnannotatedField());
+	}
+	
+	@Test(expected=CassandraOperationException.class)
+	public void testF2_InsertObject_NullKey() throws Exception {		
+		StandardColumnTestClass testObject = new StandardColumnTestClass();	
+		cassandra.insert(StandardColumnTestClass.class, testObject);	
 	}
 	
 	@Test
 	public void testG_UpdateObjectAndRetrieveIt() throws Exception {
 		String key = "objectKey";
-		StandardColumnTestClass startingObject = (StandardColumnTestClass) template.get(StandardColumnTestClass.class, key);
+		StandardColumnTestClass startingObject = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, key);
 		String originalValue = startingObject.getAStringColumn();
-		
+		startingObject.setAnUnannotatedField("more unannotated!");
 		startingObject.setAnIntegerColumn(50);
-		template.update(startingObject);
+		cassandra.update(startingObject);
 		
-		StandardColumnTestClass resultObject = (StandardColumnTestClass) template.get(StandardColumnTestClass.class, key);
+		StandardColumnTestClass resultObject = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, key);
 		Assert.assertEquals(key, resultObject.getKey());
 		Assert.assertEquals(new Integer(50), resultObject.getAnIntegerColumn());
 		Assert.assertEquals(originalValue, resultObject.getAStringColumn());
+		Assert.assertNull(resultObject.getAnUnannotatedField());
 	}
 	
 	@Test
 	public void testH_CleanUpTheMess() throws Exception {
 		
-		StandardColumnTestClass result = (StandardColumnTestClass) template.get(StandardColumnTestClass.class, "objectKey");
+		StandardColumnTestClass result = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, "objectKey");
 		System.out.println(result);
 
-		template.remove(StandardColumnTestClass.class, "objectKey");
-		int afterDeleteCount = template.count(STANDARD_1_COLUMN_FAMILY, "objectKey");
+		cassandra.remove(StandardColumnTestClass.class, "objectKey");
+		int afterDeleteCount = cassandra.count(STANDARD_1_COLUMN_FAMILY, "objectKey");
 		
 		Assert.assertEquals(0, afterDeleteCount);
 	}

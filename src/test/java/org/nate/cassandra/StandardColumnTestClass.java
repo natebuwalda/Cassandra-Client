@@ -16,6 +16,8 @@ public class StandardColumnTestClass {
 	@Column
 	private Integer anIntegerColumn;
 	
+	private String anUnannotatedField;
+	
 	public void setKey(String key) {
 		this.key = key;
 	}
@@ -44,6 +46,14 @@ public class StandardColumnTestClass {
 	public String toString() {
 		return "StandardColumnTestClass [key=" + key  + ", aStringColumn=" + aStringColumn
 				+ ", anIntegerColumn=" + anIntegerColumn + "]";
+	}
+
+	public void setAnUnannotatedField(String anUnannotatedField) {
+		this.anUnannotatedField = anUnannotatedField;
+	}
+
+	public String getAnUnannotatedField() {
+		return anUnannotatedField;
 	}
 
 	
