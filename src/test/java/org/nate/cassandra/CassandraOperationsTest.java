@@ -123,10 +123,8 @@ public class CassandraOperationsTest {
 	}
 	
 	@Test
-	public void testH_CleanUpTheMess() throws Exception {
-		
+	public void testH_CleanUpTheMess() throws Exception {		
 		StandardColumnTestClass result = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, "objectKey");
-		System.out.println(result);
 
 		cassandra.remove(StandardColumnTestClass.class, "objectKey");
 		int afterDeleteCount = cassandra.count(STANDARD_1_COLUMN_FAMILY, "objectKey");
