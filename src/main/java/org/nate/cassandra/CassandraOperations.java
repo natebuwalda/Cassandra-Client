@@ -73,7 +73,6 @@ public class CassandraOperations implements Cassandra {
 		try {
 			final Object result = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
 			
-			openConnection();
 			if (clazz.isAnnotationPresent(ColumnFamily.class)) {
 				String columnFamilyName = determineColumnFamily(clazz); 
 				SlicePredicate slicePredicate = createSlicePredicate();
@@ -103,16 +102,13 @@ public class CassandraOperations implements Cassandra {
 			}
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform get operation", e);
-		} finally {
-			closeConnection();
-		}
+		} 
 	}
 
 
 	public String getColumnValue(String columnFamily, String key, String column) throws CassandraOperationException {
 		String result = null;
 		try {
-			openConnection();
 			ColumnPath columnPath = new ColumnPath();
 			columnPath.setColumn(column.getBytes());
 			columnPath.setColumn_family(columnFamily);
@@ -123,9 +119,7 @@ public class CassandraOperations implements Cassandra {
 			// eat this, we will just return a null value if none is found
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform get string value operation", e);
-		} finally {
-			closeConnection();
-		}
+		} 
 		
 		return result;
 	}
@@ -133,8 +127,6 @@ public class CassandraOperations implements Cassandra {
 
 	public void insert(Class<? extends Object> clazz, final Object insertObject) throws CassandraOperationException {
 		try {
-			openConnection();
-	
 			if (clazz.isAnnotationPresent(ColumnFamily.class)) {
 				final String columnFamilyName = determineColumnFamily(clazz);
 				
@@ -146,38 +138,29 @@ public class CassandraOperations implements Cassandra {
 				if (key == null) {
 					throw new IllegalArgumentException("No key found");
 				} else {
-					ListFunctions.act(declaredFields, new ActionFn<Field>(){
-						public void apply(Field field) throws FunctorException {
-							try {
-								if (field.isAnnotationPresent(org.nate.cassandra.Column.class)) {
-									field.setAccessible(true);
-									Object fieldValue = field.get(insertObject);
-									if (fieldValue != null) {	
-										ColumnPath columnPath = new ColumnPath();
-										columnPath.setColumn(determineColumnName(field).getBytes());
-										columnPath.setColumn_family(columnFamilyName);
-										client.insert(keyspaceName, convertValueToString(key), columnPath, convertValueToString(fieldValue).getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
-									}
-								}
-							} catch (Exception e) {
-								throw new FunctorException("insertColumn function failed", e);
-							} 
+					for (Field field : declaredFields) {
+						if (field.isAnnotationPresent(org.nate.cassandra.Column.class)) {
+							field.setAccessible(true);
+							Object fieldValue = field.get(insertObject);
+							if (fieldValue != null) {	
+								ColumnPath columnPath = new ColumnPath();
+								columnPath.setColumn(determineColumnName(field).getBytes());
+								columnPath.setColumn_family(columnFamilyName);
+								client.insert(keyspaceName, convertValueToString(key), columnPath, convertValueToString(fieldValue).getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
+							}
 						}
-					});	
-				}
+					}
+				}	
 			} else {
 				throw new IllegalArgumentException(Joiner.on(SPACE_SEPARATOR).join("Class", clazz.getName(), "is not a ColumnFamily"));
 			}
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform insert by object opertion", e);
-		} finally {
-			closeConnection();
-		}
+		} 
 	}
 
 	public void insertColumnValue(String columnFamily, String key, String column, String value) throws CassandraOperationException {
 		try {
-			openConnection();
 			ColumnPath columnPath = new ColumnPath();
 			columnPath.setColumn(column.getBytes());
 			columnPath.setColumn_family(columnFamily);
@@ -185,58 +168,40 @@ public class CassandraOperations implements Cassandra {
 			client.insert(keyspaceName, key, columnPath, value.getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform insert string operation", e);
-		} finally {
-			closeConnection();
-		}
+		} 
 	}
 
 
 	public void remove(Class<? extends Object> clazz, final String key) {
-		log.debug("***** CASSANDRA REMOVE COMMAND ISSUED *****");
 		try {
-			openConnection();
 			if (clazz.isAnnotationPresent(ColumnFamily.class)) {
 				final String columnFamilyName = determineColumnFamily(clazz);
 				SlicePredicate slicePredicate = createSlicePredicate();
 				
 				List<ColumnOrSuperColumn> sliceResults = Lists.newArrayList(client.get_slice(keyspaceName, key, new ColumnParent(columnFamilyName), slicePredicate, ConsistencyLevel.ONE));
-				log.debug(Joiner.on(SPACE_SEPARATOR).join(key, "slice size:", sliceResults.size()));
 				
-				ListFunctions.act(sliceResults, new ActionFn<ColumnOrSuperColumn>(){
-					public void apply(ColumnOrSuperColumn it) throws FunctorException {
-						log.debug(Joiner.on(SPACE_SEPARATOR).join("*** removing slice contents: ", new String(it.getColumn().getName()), ":", new String(it.getColumn().getValue())));
-						try {
-							ColumnPath columnPath = new ColumnPath();
-							columnPath.setColumn(it.getColumn().getName());
-							columnPath.setColumn_family(columnFamilyName);
-							client.remove(keyspaceName, key, columnPath, System.currentTimeMillis(), ConsistencyLevel.ALL);
-						} catch (Exception e) {
-							throw new FunctorException("removeColumn function failed", e);
-						}
-					}
-				});
+				for (ColumnOrSuperColumn it : sliceResults) {
+					ColumnPath columnPath = new ColumnPath();
+					columnPath.setColumn(it.getColumn().getName());
+					columnPath.setColumn_family(columnFamilyName);
+					client.remove(keyspaceName, key, columnPath, System.currentTimeMillis(), ConsistencyLevel.ALL);			
+				}
 			}
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform remove operation for key " + key, e);
-		} finally {
-			closeConnection();
-		}
+		} 
 	}
 
 	public void removeColumnValue(String columnFamily, String key, String column) throws CassandraOperationException {
 		try {
-			openConnection();
 			ColumnPath columnPath = new ColumnPath();
 			columnPath.setColumn(column.getBytes());
 			columnPath.setColumn_family(columnFamily);
 				
 			client.remove(keyspaceName, key, columnPath, System.currentTimeMillis(), ConsistencyLevel.ALL);
-			log.debug(Joiner.on(SPACE_SEPARATOR).join("Removed column", column, "for key", key, "successfully"));
 		} catch (Exception e) {
 			throw new CassandraOperationException(Joiner.on(SPACE_SEPARATOR).join("Unable to perform remove column value operation for key", key, "column", column), e);
-		} finally {
-			closeConnection();
-		}
+		} 
 	}
 
 	public void setHost(String host) {
@@ -257,11 +222,8 @@ public class CassandraOperations implements Cassandra {
 	}
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public void update(final Object updateObject) {
-		log.debug("***** CASSANDRA UPDATE COMMAND ISSUED *****");
+	public void update(final Object updateObject) throws CassandraOperationException {
 		try {
-			openConnection();
-			
 			if (updateObject == null) {
 				throw new IllegalArgumentException("Object to be updated cannot be null");
 			}
@@ -271,15 +233,7 @@ public class CassandraOperations implements Cassandra {
 				String columnFamilyName = determineColumnFamily(updatedObjectsClass); 
 				
 				final List<Field> declaredFields = Lists.newArrayList(updatedObjectsClass.getDeclaredFields());	
-				Option<Field> keyFieldOption = ListFunctions.find(declaredFields, new FilterFn<Field>() {
-					public boolean apply(Field it) throws FunctorException {
-						if (it.isAnnotationPresent(Key.class)) {
-							return true;
-						}
-						return false;
-					}
-					
-				});
+				Option<Field> keyFieldOption = keyFieldFor(declaredFields);
 				keyFieldOption.get().setAccessible(true);
 				final Object key = keyFieldOption.get().get(updateObject);
 				
@@ -291,7 +245,6 @@ public class CassandraOperations implements Cassandra {
 							try {
 								Mutation mutation = null;
 								if (field.isAnnotationPresent(org.nate.cassandra.Column.class)) {
-									log.debug(field.getName());
 									mutation = new Mutation();
 									field.setAccessible(true);
 									Object fieldValue = field.get(updateObject);
@@ -315,14 +268,7 @@ public class CassandraOperations implements Cassandra {
 					
 					List<Mutation> filteredMutations = ListFunctions.filter(mutations, new FilterFn<Mutation>() {
 						public boolean apply(Mutation it) throws FunctorException {
-							try {
-								if (it != null) {
-									return true;
-								}
-								return false;
-							} catch (Exception e) {
-								throw new FunctorException("filterMutations function failed", e);
-							}
+							return it != null;
 						}
 					});
 					
@@ -335,15 +281,12 @@ public class CassandraOperations implements Cassandra {
 					client.batch_mutate(keyspaceName, rowUpdates, ConsistencyLevel.ALL);
 				} 
 			}
-			log.debug("Updated object " + updateObject + " successfully");
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform object update", e);
-		} finally {
-			closeConnection();
-		}
+		} 
 	}
 	
-	private void closeConnection() throws CassandraOperationException {
+	public void closeConnection() throws CassandraOperationException {
 		try {
 			if (client != null && transport.isOpen()) {
 				transport.flush();
@@ -363,7 +306,7 @@ public class CassandraOperations implements Cassandra {
 			converted = string;
 		} else if ("byte[]".equals(fieldType.getSimpleName())) {
 			converted = string.getBytes();
-		}else if (StringUtils.isNumeric(string)) {
+		} else if (StringUtils.isNumeric(string)) {
 			converted = fieldType.getConstructor(new Class[]{String.class}).newInstance(new Object[]{string});
 		}
 		
@@ -401,16 +344,13 @@ public class CassandraOperations implements Cassandra {
 			if (runtimeAnnotation != null) {
 				Method nameMethod = ((Class<? extends Annotation>) runtimeAnnotation.getClass()).getMethod("name", new Class<?>[]{});
 				columnFamilyName  = (String) nameMethod.invoke(runtimeAnnotation, new Object[]{});
-				log.debug(ColumnFamily.class + " annotated class name value " + columnFamilyName);
 			}
 		} catch (NoSuchMethodException nsme) {
 			//eat this exception because we do not care
-			log.debug("Annotation " + ColumnFamily.class + " does not have a 'name' method", nsme);
 		}
 		
 		if (columnFamilyName  == null || columnFamilyName.isEmpty()) {
 			columnFamilyName  = clazz.getSimpleName();
-			log.debug(ColumnFamily.class + " did not have a name value, using class name " + columnFamilyName);
 		}
 		return columnFamilyName;
 	}
@@ -425,13 +365,11 @@ public class CassandraOperations implements Cassandra {
 				columnName = (String) nameMethod.invoke(runtimeAnnotation, new Object[]{});
 			}
 		} catch (NoSuchMethodException nsme) {
-			//eat this exception because we do not care
-			log.debug("Annotation " + org.nate.cassandra.Column.class + " does not have a 'name' method", nsme);
+			
 		}
 		
 		if (columnName == null || columnName.isEmpty()) {
 			columnName = field.getName();
-			log.debug(org.nate.cassandra.Column.class + " did not have a name value, using field name " + columnName);
 		} 
 		return columnName;
 	}
@@ -445,11 +383,15 @@ public class CassandraOperations implements Cassandra {
 		return keyFieldOption;
 	}
 
-	private void openConnection() throws TTransportException {
+	public void openConnection() throws CassandraOperationException {
 		transport = new TSocket(host, port, timeout);
 		TProtocol protocol = new TBinaryProtocol(transport);
 		client = new Client(protocol);
-		transport.open();
+		try {
+			transport.open();
+		} catch (TTransportException e) {
+			throw new CassandraOperationException("unable to open connetion", e);
+		}
 	}
 
 }
