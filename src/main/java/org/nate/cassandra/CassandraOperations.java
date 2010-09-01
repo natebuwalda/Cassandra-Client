@@ -26,7 +26,6 @@ import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
-import org.nate.functions.functors.ActionFn;
 import org.nate.functions.functors.FilterFn;
 import org.nate.functions.functors.ListFunctions;
 import org.nate.functions.functors.TransformFn;
@@ -48,6 +47,19 @@ public class CassandraOperations implements Cassandra {
 	private TTransport transport;
 	private Client client;
 	private String keyspaceName = "Keyspace1";
+
+
+	public void closeConnection() throws CassandraOperationException {
+		try {
+			if (client != null && transport.isOpen()) {
+				transport.flush();
+				transport.close();
+			}
+			client = null;
+		} catch (Exception e) {
+			throw new CassandraOperationException("Unable to close connection", e);
+		}
+	}
 
 
 	public int count(String columnFamily, String key) throws CassandraOperationException {
@@ -109,10 +121,7 @@ public class CassandraOperations implements Cassandra {
 	public String getColumnValue(String columnFamily, String key, String column) throws CassandraOperationException {
 		String result = null;
 		try {
-			ColumnPath columnPath = new ColumnPath();
-			columnPath.setColumn(column.getBytes());
-			columnPath.setColumn_family(columnFamily);
-
+			ColumnPath columnPath = createColumnPath(columnFamily, column.getBytes());
 			Column resultColumn = client.get(keyspaceName, key, columnPath, ConsistencyLevel.ONE).getColumn();		
 			result = new String(resultColumn.value);
 		} catch (NotFoundException nfe) {
@@ -123,7 +132,6 @@ public class CassandraOperations implements Cassandra {
 		
 		return result;
 	}
-
 
 	public void insert(Class<? extends Object> clazz, final Object insertObject) throws CassandraOperationException {
 		try {
@@ -143,9 +151,7 @@ public class CassandraOperations implements Cassandra {
 							field.setAccessible(true);
 							Object fieldValue = field.get(insertObject);
 							if (fieldValue != null) {	
-								ColumnPath columnPath = new ColumnPath();
-								columnPath.setColumn(determineColumnName(field).getBytes());
-								columnPath.setColumn_family(columnFamilyName);
+								ColumnPath columnPath = createColumnPath(columnFamilyName, determineColumnName(field).getBytes());
 								client.insert(keyspaceName, convertValueToString(key), columnPath, convertValueToString(fieldValue).getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
 							}
 						}
@@ -159,18 +165,27 @@ public class CassandraOperations implements Cassandra {
 		} 
 	}
 
+
 	public void insertColumnValue(String columnFamily, String key, String column, String value) throws CassandraOperationException {
 		try {
-			ColumnPath columnPath = new ColumnPath();
-			columnPath.setColumn(column.getBytes());
-			columnPath.setColumn_family(columnFamily);
-	
+			ColumnPath columnPath = createColumnPath(columnFamily, column.getBytes());
 			client.insert(keyspaceName, key, columnPath, value.getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform insert string operation", e);
 		} 
 	}
 
+
+	public void openConnection() throws CassandraOperationException {
+		transport = new TSocket(host, port, timeout);
+		TProtocol protocol = new TBinaryProtocol(transport);
+		client = new Client(protocol);
+		try {
+			transport.open();
+		} catch (TTransportException e) {
+			throw new CassandraOperationException("unable to open connetion", e);
+		}
+	}
 
 	public void remove(Class<? extends Object> clazz, final String key) {
 		try {
@@ -181,9 +196,7 @@ public class CassandraOperations implements Cassandra {
 				List<ColumnOrSuperColumn> sliceResults = Lists.newArrayList(client.get_slice(keyspaceName, key, new ColumnParent(columnFamilyName), slicePredicate, ConsistencyLevel.ONE));
 				
 				for (ColumnOrSuperColumn it : sliceResults) {
-					ColumnPath columnPath = new ColumnPath();
-					columnPath.setColumn(it.getColumn().getName());
-					columnPath.setColumn_family(columnFamilyName);
+					ColumnPath columnPath = createColumnPath(columnFamilyName, it.getColumn().getName());
 					client.remove(keyspaceName, key, columnPath, System.currentTimeMillis(), ConsistencyLevel.ALL);			
 				}
 			}
@@ -211,11 +224,11 @@ public class CassandraOperations implements Cassandra {
 	public void setKeyspaceName(String keyspaceName) {
 		this.keyspaceName = keyspaceName;
 	}
-
+	
+	
 	public void setPort(Integer port) {
 		this.port = port;
 	}
-	
 	
 	public void setTimeout(Integer timeout) {
 		this.timeout = timeout;
@@ -248,11 +261,7 @@ public class CassandraOperations implements Cassandra {
 									mutation = new Mutation();
 									field.setAccessible(true);
 									Object fieldValue = field.get(updateObject);
-
-									Column column = new Column();
-									column.setName(field.getName().getBytes());
-									column.setValue(convertValueToString(fieldValue).getBytes());
-									column.setTimestamp(System.currentTimeMillis());
+									Column column = createColumnObject(field, fieldValue);
 									
 									ColumnOrSuperColumn columnOrSuper = new ColumnOrSuperColumn();
 									columnOrSuper.setColumn(column);
@@ -285,18 +294,6 @@ public class CassandraOperations implements Cassandra {
 			throw new CassandraOperationException("Unable to perform object update", e);
 		} 
 	}
-	
-	public void closeConnection() throws CassandraOperationException {
-		try {
-			if (client != null && transport.isOpen()) {
-				transport.flush();
-				transport.close();
-			}
-			client = null;
-		} catch (Exception e) {
-			throw new CassandraOperationException("Unable to close connection", e);
-		}
-	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" }) 
 	private Object convertStringToValue(String string, Class fieldType) throws IllegalArgumentException, SecurityException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
@@ -325,6 +322,21 @@ public class CassandraOperations implements Cassandra {
 			throw new IllegalArgumentException("Value must be a String or a Number, was " + value.toString());
 		}
 		return converted;
+	}
+
+	private Column createColumnObject(Field field, Object fieldValue) {
+		Column column = new Column();
+		column.setName(field.getName().getBytes());
+		column.setValue(convertValueToString(fieldValue).getBytes());
+		column.setTimestamp(System.currentTimeMillis());
+		return column;
+	}
+
+	private ColumnPath createColumnPath(final String columnFamilyName, byte[] columnName) {
+		ColumnPath columnPath = new ColumnPath();
+		columnPath.setColumn(columnName);
+		columnPath.setColumn_family(columnFamilyName);
+		return columnPath;
 	}
 
 	private SlicePredicate createSlicePredicate() {
@@ -365,7 +377,7 @@ public class CassandraOperations implements Cassandra {
 				columnName = (String) nameMethod.invoke(runtimeAnnotation, new Object[]{});
 			}
 		} catch (NoSuchMethodException nsme) {
-			
+			//eat this exception because we do not care
 		}
 		
 		if (columnName == null || columnName.isEmpty()) {
@@ -374,6 +386,7 @@ public class CassandraOperations implements Cassandra {
 		return columnName;
 	}
 
+
 	private Option<Field> keyFieldFor(List<Field> declaredFields) {
 		Option<Field> keyFieldOption = ListFunctions.find(declaredFields, new FilterFn<Field>(){
 			public boolean apply(Field it) {
@@ -381,17 +394,6 @@ public class CassandraOperations implements Cassandra {
 			}	
 		});
 		return keyFieldOption;
-	}
-
-	public void openConnection() throws CassandraOperationException {
-		transport = new TSocket(host, port, timeout);
-		TProtocol protocol = new TBinaryProtocol(transport);
-		client = new Client(protocol);
-		try {
-			transport.open();
-		} catch (TTransportException e) {
-			throw new CassandraOperationException("unable to open connetion", e);
-		}
 	}
 
 }
