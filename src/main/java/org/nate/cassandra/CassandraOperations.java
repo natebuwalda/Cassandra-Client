@@ -81,7 +81,7 @@ public class CassandraOperations implements Cassandra {
 
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public Object get(Class clazz, final String key) {
+	public Object get(Class clazz, final String key) throws CassandraOperationException {
 		try {
 			final Object result = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
 			
@@ -187,7 +187,7 @@ public class CassandraOperations implements Cassandra {
 		}
 	}
 
-	public void remove(Class<? extends Object> clazz, final String key) {
+	public void remove(Class<? extends Object> clazz, final String key) throws CassandraOperationException {
 		try {
 			if (clazz.isAnnotationPresent(ColumnFamily.class)) {
 				final String columnFamilyName = determineColumnFamily(clazz);

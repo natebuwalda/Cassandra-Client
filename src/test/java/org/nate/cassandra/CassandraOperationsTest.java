@@ -23,7 +23,7 @@ public class CassandraOperationsTest {
 	public void setup() {
 		cassandra = new CassandraOperations();
 		cassandra.setKeyspaceName("Keyspace1");
-		cassandra.setHost("localhost");
+		cassandra.setHost("cassandra1.localhost");
 		cassandra.setPort(9160);
 		cassandra.setTimeout(1000);
 	}
