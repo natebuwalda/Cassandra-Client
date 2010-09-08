@@ -5,8 +5,6 @@ import java.util.Random;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.nate.cassandra.CassandraOperationException;
-import org.nate.cassandra.CassandraOperations;
 
 public class CassandraOperationsTest {
 
@@ -23,7 +21,7 @@ public class CassandraOperationsTest {
 	public void setup() {
 		cassandra = new CassandraOperations();
 		cassandra.setKeyspaceName("Keyspace1");
-		cassandra.setHost("cassandra1.localhost");
+		cassandra.setHost("localhost");
 		cassandra.setPort(9160);
 		cassandra.setTimeout(1000);
 	}
@@ -123,7 +121,14 @@ public class CassandraOperationsTest {
 	}
 	
 	@Test
-	public void testH_CleanUpTheMess() throws Exception {		
+	public void testH_Describe() throws Exception {
+		String result = cassandra.describe();
+		
+		Assert.assertEquals("", result);
+	}
+	
+	@Test
+	public void testI_CleanUpTheMess() throws Exception {		
 		StandardColumnTestClass result = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, "objectKey");
 
 		cassandra.remove(StandardColumnTestClass.class, "objectKey");

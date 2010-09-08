@@ -7,6 +7,7 @@ public aspect UnitOfWorkListener {
 	pointcut removeObject(Cassandra c): execution(* Cassandra.remove*(..)) && target(c);
 	pointcut updateObject(Cassandra c): execution(* Cassandra.update*(..)) && target(c);
 	pointcut count(Cassandra c): execution(* Cassandra.count(..)) && target(c);
+	pointcut describe(Cassandra c): execution(* Cassandra.describe()) && target(c);
 
 	Object around(Cassandra c): 
 		getObject(c) {
@@ -63,6 +64,18 @@ public aspect UnitOfWorkListener {
 				return proceed(c);
 			} catch (Exception e) {
 				throw new CassandraOperationException("exception occured during count call", e);
+			} finally {
+				c.closeConnection();
+			}
+		}
+	
+	String around(Cassandra c): 
+		describe(c) {
+			try {
+				c.openConnection();
+				return proceed(c);
+			} catch (Exception e) {
+				throw new CassandraOperationException("exception occured during describe call", e);
 			} finally {
 				c.closeConnection();
 			}

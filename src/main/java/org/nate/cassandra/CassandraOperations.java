@@ -65,7 +65,6 @@ public class CassandraOperations implements Cassandra {
 	public int count(String columnFamily, String key) throws CassandraOperationException {
 		int count = 0;
 		try {
-			openConnection();
 			SlicePredicate slicePredicate = createSlicePredicate();
 			
 			List<ColumnOrSuperColumn> sliceResults = client.get_slice(keyspaceName, key, new ColumnParent(columnFamily), slicePredicate, ConsistencyLevel.ONE);
@@ -73,10 +72,31 @@ public class CassandraOperations implements Cassandra {
 			count = sliceResults.size();
 		} catch (Exception e) {
 			throw new CassandraOperationException("Unable to perform count operation", e);
-		} finally {
-			closeConnection();
-		}
+		} 
 		return count;
+	}
+
+
+	public String describe() throws CassandraOperationException {
+		StringBuilder keyspaceDescription = new StringBuilder(keyspaceName);
+		keyspaceDescription.append("{\n");
+		try {
+			Map<String, Map<String, String>> keyspaceRepresentationMap = client.describe_keyspace(keyspaceName);
+			
+			for (String columnName : keyspaceRepresentationMap.keySet()) {
+				keyspaceDescription.append("\t").append(columnName).append("{\n"); 
+				for (String columnAttribute : keyspaceRepresentationMap.get(columnName).keySet()){
+					String columnAttributeValue = keyspaceRepresentationMap.get(columnName).get(columnAttribute);
+					keyspaceDescription.append("\t\t").append(columnAttribute).append(" : ").append(columnAttributeValue).append("\n");
+				}
+				keyspaceDescription.append("\t}\n");
+			}
+		} catch (Exception e) {
+			throw new CassandraOperationException("Unable to perform describe operation", e);
+		}
+		keyspaceDescription.append("}");
+		System.out.println(keyspaceDescription.toString());
+		return keyspaceDescription.toString();
 	}
 
 
@@ -117,7 +137,6 @@ public class CassandraOperations implements Cassandra {
 		} 
 	}
 
-
 	public String getColumnValue(String columnFamily, String key, String column) throws CassandraOperationException {
 		String result = null;
 		try {
@@ -132,6 +151,7 @@ public class CassandraOperations implements Cassandra {
 		
 		return result;
 	}
+
 
 	public void insert(Class<? extends Object> clazz, final Object insertObject) throws CassandraOperationException {
 		try {
@@ -174,7 +194,6 @@ public class CassandraOperations implements Cassandra {
 			throw new CassandraOperationException("Unable to perform insert string operation", e);
 		} 
 	}
-
 
 	public void openConnection() throws CassandraOperationException {
 		transport = new TSocket(host, port, timeout);
@@ -220,11 +239,11 @@ public class CassandraOperations implements Cassandra {
 	public void setHost(String host) {
 		this.host = host;
 	}
-
+	
+	
 	public void setKeyspaceName(String keyspaceName) {
 		this.keyspaceName = keyspaceName;
 	}
-	
 	
 	public void setPort(Integer port) {
 		this.port = port;
@@ -233,7 +252,7 @@ public class CassandraOperations implements Cassandra {
 	public void setTimeout(Integer timeout) {
 		this.timeout = timeout;
 	}
-	
+
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void update(final Object updateObject) throws CassandraOperationException {
 		try {
@@ -366,6 +385,7 @@ public class CassandraOperations implements Cassandra {
 		}
 		return columnFamilyName;
 	}
+
 
 	private String determineColumnName(Field field) throws IllegalAccessException, InvocationTargetException {
 		String columnName = null;
