@@ -8,22 +8,23 @@ import org.junit.Test;
 
 public class CassandraOperationsTest {
 
-	private static final String STANDARD_1_COLUMN_FAMILY = "Standard1";
 	/* NOTE:
 	 * 
 	 * Tests are lettered because they need to be executed in order (for now)
 	 * Sorry for the silly.  --Nate
 	 * 
 	 */
+	
+	private static final String STANDARD_1_COLUMN_FAMILY = "Standard1";
 	private CassandraOperations cassandra;
 	
 	@Before
 	public void setup() {
 		cassandra = new CassandraOperations();
 		cassandra.setKeyspaceName("Keyspace1");
-		cassandra.setHost("localhost");
-		cassandra.setPort(9160);
-		cassandra.setTimeout(1000);
+//		cassandra.setHost("localhost");
+//		cassandra.setPort(9160);
+//		cassandra.setTimeout(1000);
 	}
 	
 	@Test

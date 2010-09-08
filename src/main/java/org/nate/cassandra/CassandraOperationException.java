@@ -9,6 +9,10 @@ public class CassandraOperationException extends RuntimeException {
 		super();
 	}
 
+	public CassandraOperationException(String message) {
+		super(message);
+	}
+	
 	public CassandraOperationException(String message, Throwable cause) {
 		super(message, cause);
 	}
