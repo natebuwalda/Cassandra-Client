@@ -1,10 +1,14 @@
 package org.nate.cassandra;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import com.google.common.collect.Lists;
 
 public class CassandraOperationsTest {
 
@@ -22,9 +26,11 @@ public class CassandraOperationsTest {
 	public void setup() {
 		cassandra = new CassandraOperations();
 		cassandra.setKeyspaceName("Keyspace1");
-//		cassandra.setHost("localhost");
-//		cassandra.setPort(9160);
-//		cassandra.setTimeout(1000);
+
+		ConnectionFactory testFactory = new ConnectionFactory("localhost", 9160, 1000);
+		List<ConnectionFactory> factories = Lists.newArrayList(testFactory);
+		ConnectionPool connectionPool = new ConnectionPool(1, 2000L, factories);
+		cassandra.setConnectionPool(connectionPool);
 	}
 	
 	@Test
@@ -123,9 +129,10 @@ public class CassandraOperationsTest {
 	
 	@Test
 	public void testH_Describe() throws Exception {
+		// will test the formatting of the describe string later
 		String result = cassandra.describe();
 		
-		Assert.assertEquals("", result);
+		Assert.assertNotNull(result);
 	}
 	
 	@Test

@@ -12,8 +12,6 @@ public interface Cassandra {
 	void remove(Class<? extends Object> clazz, String key) throws CassandraOperationException;
 	void removeColumnValue(String columnFamily, String key, String column) throws CassandraOperationException;
 	void update(Object updateObject) throws CassandraOperationException;
-	void openConnection() throws CassandraOperationException;
-	void closeConnection() throws CassandraOperationException;
 	String describe() throws CassandraOperationException;
 	
 }

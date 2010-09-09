@@ -52,6 +52,7 @@ public class ConnectionPool {
 			});
 			if (possible.isSome()) {
 				connection = possible.get();
+				connection.openConnection();
 				targetHostPool.put(connection, false);
 			}
 			long end = System.currentTimeMillis();
