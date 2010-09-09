@@ -7,6 +7,8 @@ import java.util.Random;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.nate.cassandra.connector.ConnectionFactory;
+import org.nate.cassandra.connector.ConnectionPool;
 
 import com.google.common.collect.Lists;
 

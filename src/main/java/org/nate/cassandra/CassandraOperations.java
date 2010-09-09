@@ -21,6 +21,10 @@ import org.apache.cassandra.thrift.SliceRange;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nate.cassandra.annotation.ColumnFamily;
+import org.nate.cassandra.annotation.Key;
+import org.nate.cassandra.connector.Connection;
+import org.nate.cassandra.connector.ConnectionPool;
 import org.nate.functions.functors.FilterFn;
 import org.nate.functions.functors.ListFunctions;
 import org.nate.functions.functors.TransformFn;
@@ -150,7 +154,7 @@ public class CassandraOperations implements Cassandra {
 						throw new IllegalArgumentException("No key found");
 					} else {
 						for (Field field : declaredFields) {
-							if (field.isAnnotationPresent(org.nate.cassandra.Column.class)) {
+							if (field.isAnnotationPresent(org.nate.cassandra.annotation.Column.class)) {
 								field.setAccessible(true);
 								Object fieldValue = field.get(insertObject);
 								if (fieldValue != null) {	
@@ -240,7 +244,7 @@ public class CassandraOperations implements Cassandra {
 							public Mutation apply(Field field) throws FunctorException {
 								try {
 									Mutation mutation = null;
-									if (field.isAnnotationPresent(org.nate.cassandra.Column.class)) {
+									if (field.isAnnotationPresent(org.nate.cassandra.annotation.Column.class)) {
 										mutation = new Mutation();
 										field.setAccessible(true);
 										Object fieldValue = field.get(updateObject);
@@ -354,7 +358,7 @@ public class CassandraOperations implements Cassandra {
 		String columnName = null;
 		
 		try {
-			Annotation runtimeAnnotation = field.getAnnotation(org.nate.cassandra.Column.class);
+			Annotation runtimeAnnotation = field.getAnnotation(org.nate.cassandra.annotation.Column.class);
 			if (runtimeAnnotation != null) {
 				Method nameMethod = ((Class<? extends Annotation>) runtimeAnnotation.getClass()).getMethod("name", new Class<?>[]{});
 				columnName = (String) nameMethod.invoke(runtimeAnnotation, new Object[]{});

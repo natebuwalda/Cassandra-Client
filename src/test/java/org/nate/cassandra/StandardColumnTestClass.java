@@ -1,8 +1,8 @@
 package org.nate.cassandra;
 
-import org.nate.cassandra.Column;
-import org.nate.cassandra.ColumnFamily;
-import org.nate.cassandra.Key;
+import org.nate.cassandra.annotation.Column;
+import org.nate.cassandra.annotation.ColumnFamily;
+import org.nate.cassandra.annotation.Key;
 
 @ColumnFamily(name="Standard1")
 public class StandardColumnTestClass {
