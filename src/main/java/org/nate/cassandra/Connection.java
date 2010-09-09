@@ -51,5 +51,18 @@ public class Connection {
 	public boolean isOpen() {
 		return open;
 	}
+
+	public String getHost() {
+		return host;
+	}
+
+	public Integer getPort() {
+		return port;
+	}
+
+	public Client getClient() {
+		return client;
+	}
+	
 	
 }
