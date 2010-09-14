@@ -5,10 +5,10 @@
 	
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.nbuwalda.playthings</groupId>
-	<artifactId>cassandra-spring</artifactId>
+	<artifactId>cassandra-client</artifactId>
 	<version>1.0.0.CI-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>Cassandra Spring</name>
+	<name>Cassandra Client</name>
 	
 	<properties>
 		<maven.test.failure.ignore>true</maven.test.failure.ignore>
@@ -99,7 +99,7 @@
 	</dependencies>
 
 
-	<description>A spring template style interface for working with Apache Cassandra</description>
+	<description>A client interface for working with Apache Cassandra</description>
 	<build>
 		<pluginManagement>
 			<plugins>
