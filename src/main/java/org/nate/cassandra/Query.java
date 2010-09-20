@@ -33,6 +33,10 @@ public class Query<T> {
 	}
 	
 	public ResultSet<T> execute(final Class<T> clazz, final Triplet<String, QueryConditional, String>... queryArgs) throws CassandraOperationException {
+		if (queryArgs == null || queryArgs.length == 0) {
+			throw new CassandraOperationException("You must provide at least one query argument triplet");
+		}
+		
 		try {
 			ResultSet<T> consolidatedResults = new ResultSet<T>();
 			for (final Triplet<String, QueryConditional, String> queryArg : queryArgs) {

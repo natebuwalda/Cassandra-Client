@@ -167,6 +167,11 @@ public class QueryTest {
 		Assert.assertEquals(firstObject.getAStringColumn(), results.get(1).getAStringColumn());
 	}
 	
+	@Test(expected=CassandraOperationException.class)
+	public void testJ_queryNoArgs() throws Exception {
+		List<StandardColumnTestClass> results = query.execute(StandardColumnTestClass.class, null).results;
+	}
+	
 	@Test
 	public void testK_CleanUpTheMess() throws Exception {		
 		cassandra.remove(StandardColumnTestClass.class, "firstKey");
