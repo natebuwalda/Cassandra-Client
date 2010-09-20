@@ -1,6 +1,7 @@
 package org.nate.cassandra;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,7 @@ import org.apache.cassandra.thrift.ColumnOrSuperColumn;
 import org.apache.cassandra.thrift.ColumnParent;
 import org.apache.cassandra.thrift.ColumnPath;
 import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.cassandra.thrift.KeySlice;
 import org.apache.cassandra.thrift.Mutation;
 import org.apache.cassandra.thrift.NotFoundException;
 import org.apache.cassandra.thrift.SlicePredicate;
@@ -112,6 +114,36 @@ public class CassandraOperations implements Cassandra {
 	}
 
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public List<? extends Object> getAll(final Class clazz) throws CassandraOperationException {
+		final List result = new ArrayList();
+			
+		try {
+			if (clazz.isAnnotationPresent(ColumnFamily.class)) {
+				final String columnFamilyName = opUtils.determineColumnFamily(clazz); 
+				final SlicePredicate slicePredicate = opUtils.createEmptySlicePredicate();
+						
+				List<KeySlice> sliceResults = worker.doWork(new Operation<List>(this) {
+					public List work() throws Exception {
+						return client.get_range_slice(keyspaceName, new ColumnParent(columnFamilyName), slicePredicate, "", "", 100, ConsistencyLevel.ONE);				
+				}}); 
+				
+				result.add(ListFunctions.transform(sliceResults, new TransformFn<Object, KeySlice>(){
+					public Object apply(KeySlice it) throws FunctorException {
+						return get(clazz, it.getKey());						
+					}	
+				}));
+				
+				return result;
+			} else {
+				throw new IllegalArgumentException(Joiner.on(SPACE_SEPARATOR).join("Class", clazz.getName(), "is not a ColumnFamily"));
+			}
+		} catch (Exception e) {
+			throw new CassandraOperationException("Unable to perform getAll operation", e);
+		}
+	}
+
+	
 	public String getColumnValue(final String columnFamily, final String key, final String column) throws CassandraOperationException {
 		return worker.doWork(new Operation<String>(this){
 			public String work() throws Exception {

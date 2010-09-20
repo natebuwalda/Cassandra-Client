@@ -137,7 +137,14 @@ public class CassandraOperationsTest {
 	}
 	
 	@Test
-	public void testI_CleanUpTheMess_1() throws Exception {		
+	public void testI_GetAll() throws Exception {
+		List<StandardColumnTestClass> results = (List<StandardColumnTestClass>) cassandra.getAll(StandardColumnTestClass.class);
+		Assert.assertNotNull(results);
+		Assert.assertEquals(1, results.size());
+	}
+	
+	@Test
+	public void testJ_CleanUpTheMess() throws Exception {		
 		cassandra.remove(StandardColumnTestClass.class, "objectKey");
 		int afterDeleteCount = cassandra.count(STANDARD_1_COLUMN_FAMILY, "objectKey");
 		
