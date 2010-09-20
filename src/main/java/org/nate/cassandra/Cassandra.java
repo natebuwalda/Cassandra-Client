@@ -1,5 +1,7 @@
 package org.nate.cassandra;
 
+import java.util.List;
+
 import org.nate.cassandra.connector.ConnectionPool;
 
 
@@ -8,6 +10,7 @@ public interface Cassandra {
 	
 	int count(String columnFamily, String key) throws CassandraOperationException;
 	Object get(Class<? extends Object> clazz, String key) throws CassandraOperationException;
+	List<Object> getAll(Class<? extends Object> clazz);
 	String getColumnValue(String columnFamily, String key, String column) throws CassandraOperationException;
 	void insert(Object insertObject) throws CassandraOperationException;
 	void insertColumnValue(String columnFamily, String key, String column, String value) throws CassandraOperationException;

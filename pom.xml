@@ -4,25 +4,11 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>net.nbuwalda.playthings</groupId>
+	<groupId>org.nate</groupId>
 	<artifactId>cassandra-client</artifactId>
-	<version>1.0.0.CI-SNAPSHOT</version>
+	<version>1.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>Cassandra Client</name>
-	
-	<properties>
-		<maven.test.failure.ignore>true</maven.test.failure.ignore>
-		<spring.framework.version>2.5.6</spring.framework.version>
-	</properties>
-	
-	<profiles>
-		<profile>
-			<id>strict</id>
-			<properties>
-				<maven.test.failure.ignore>false</maven.test.failure.ignore>
-			</properties>
-		</profile>
-	</profiles>
 
 	<dependencies>
 		<dependency>
@@ -30,14 +16,14 @@
 			<artifactId>libthrift</artifactId>
 			<version>917130</version>
 			<scope>system</scope>
-			<systemPath>${basedir}/lib/libthrift-r917130.jar</systemPath>
+			<systemPath>c:/github/nbuwalda/cassandra-client/lib/libthrift-r917130.jar</systemPath>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.cassandra</groupId>
 			<artifactId>cassandra</artifactId>
 			<version>0.6.4</version>
 			<scope>system</scope>
-			<systemPath>${basedir}/lib/apache-cassandra-0.6.4.jar</systemPath>
+			<systemPath>c:/github/nbuwalda/cassandra-client/lib/apache-cassandra-0.6.4.jar</systemPath>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
@@ -46,18 +32,12 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-test</artifactId>
-			<version>${spring.framework.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>aspectj</groupId>
+			<groupId>org.aspectj</groupId>
 			<artifactId>aspectjrt</artifactId>
 			<version>1.5.4</version>
 		</dependency>
 		<dependency>
-			<groupId>aspectj</groupId>
+			<groupId>org.aspectj</groupId>
 			<artifactId>aspectjweaver</artifactId>
 			<version>1.5.4</version>
 		</dependency>
@@ -90,7 +70,7 @@
 			<version>r06</version>
 		</dependency>
 		<dependency>
-			<groupId>functions</groupId>
+			<groupId>org.nate</groupId>
 			<artifactId>functions</artifactId>
 			<version>1.0-SNAPSHOT</version>
 			<type>jar</type>
@@ -103,11 +83,6 @@
 	<build>
 		<pluginManagement>
 			<plugins>
-				<plugin>
-					<groupId>com.springsource.bundlor</groupId>
-					<artifactId>com.springsource.bundlor.maven</artifactId>
-					<version>1.0.0.M1B</version>
-				</plugin>
 				<plugin>
 					<artifactId>maven-assembly-plugin</artifactId>
 					<inherited>false</inherited>

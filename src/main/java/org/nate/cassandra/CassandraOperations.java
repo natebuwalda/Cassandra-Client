@@ -16,8 +16,6 @@ import org.apache.cassandra.thrift.KeySlice;
 import org.apache.cassandra.thrift.Mutation;
 import org.apache.cassandra.thrift.NotFoundException;
 import org.apache.cassandra.thrift.SlicePredicate;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.nate.cassandra.annotation.ColumnFamily;
 import org.nate.cassandra.connector.ConnectionPool;
 import org.nate.functions.functors.FilterFn;
@@ -25,6 +23,7 @@ import org.nate.functions.functors.ListFunctions;
 import org.nate.functions.functors.TransformFn;
 import org.nate.functions.functors.exceptions.FunctorException;
 import org.nate.functions.options.Option;
+import org.slf4j.Logger;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
@@ -32,7 +31,7 @@ import com.google.common.collect.Lists;
 public class CassandraOperations implements Cassandra {
 
 	private static final char SPACE_SEPARATOR = ' ';
-	private static final Log log = LogFactory.getLog(CassandraOperations.class);
+	private Logger log = org.slf4j.LoggerFactory.getLogger(CassandraOperations.class);
 	private CassandraOperationUtils opUtils = new CassandraOperationUtils();
 	private OperationWorker worker = new OperationWorker(this);
 
@@ -79,6 +78,7 @@ public class CassandraOperations implements Cassandra {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public Object get(final Class clazz, final String key) throws CassandraOperationException {
+		log.debug("Performing get operation - " + clazz.getSimpleName() + ":" + key);
 		return worker.doWork(new Operation<Object>(this) {
 			public Object work() throws Exception {
 				final Object result = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
@@ -88,7 +88,11 @@ public class CassandraOperations implements Cassandra {
 					SlicePredicate slicePredicate = opUtils.createEmptySlicePredicate();
 					
 					final List<ColumnOrSuperColumn> sliceResults = client.get_slice(keyspaceName, key, new ColumnParent(columnFamilyName), slicePredicate, ConsistencyLevel.ONE);			
-
+					
+					if (sliceResults.isEmpty()) {
+						return null;
+					}
+					
 					List<Field> declaredFields = Lists.newArrayList(clazz.getDeclaredFields());				
 					Option<Field> keyFieldOption = opUtils.keyFieldFor(declaredFields);
 					keyFieldOption.get().setAccessible(true);
@@ -115,7 +119,8 @@ public class CassandraOperations implements Cassandra {
 
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public List<? extends Object> getAll(final Class clazz) throws CassandraOperationException {
+	public List<Object> getAll(final Class clazz) throws CassandraOperationException {
+		log.debug("Performing get all operation - " + clazz.getSimpleName());
 		final List result = new ArrayList();
 			
 		try {
@@ -128,12 +133,12 @@ public class CassandraOperations implements Cassandra {
 						return client.get_range_slice(keyspaceName, new ColumnParent(columnFamilyName), slicePredicate, "", "", 100, ConsistencyLevel.ONE);				
 				}}); 
 				
-				result.add(ListFunctions.transform(sliceResults, new TransformFn<Object, KeySlice>(){
+				result.addAll(ListFunctions.transform(sliceResults, new TransformFn<Object, KeySlice>(){
 					public Object apply(KeySlice it) throws FunctorException {
 						return get(clazz, it.getKey());						
 					}	
 				}));
-				
+
 				return result;
 			} else {
 				throw new IllegalArgumentException(Joiner.on(SPACE_SEPARATOR).join("Class", clazz.getName(), "is not a ColumnFamily"));

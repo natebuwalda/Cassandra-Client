@@ -12,11 +12,13 @@ import org.nate.functions.functors.FilterFn;
 import org.nate.functions.functors.ListFunctions;
 import org.nate.functions.functors.exceptions.FunctorException;
 import org.nate.functions.options.Option;
+import org.slf4j.Logger;
 
 import com.google.common.collect.Lists;
 
 public class ConnectionPool {
 
+	private Logger logger = org.slf4j.LoggerFactory.getLogger(ConnectionPool.class);
 	private List<ConnectionFactory> connectionFactories = new ArrayList<ConnectionFactory>();
 	private Map<String, Map<Connection, Boolean>> pool; // = new HashMap<String, Map<Connection, Boolean>>();
 	private Integer connectionsPerHost;
@@ -28,13 +30,16 @@ public class ConnectionPool {
 	}
 	
 	public ConnectionPool(Integer connectionsPerHost, Long waitTimeout, List<ConnectionFactory> factories) {
+		logger.debug("Setting up new connection pool (" + connectionsPerHost + " connections per host)");
 		this.connectionsPerHost = connectionsPerHost;
 		this.waitForConnectionTimeout = waitTimeout;
 		this.connectionFactories = factories;
 		this.pool = initializePool();
+		logger.debug("Pool initialized successfully");
 	}
 	
 	public Connection getConnection() throws CassandraOperationException {
+		logger.debug("Getting a new connection");
 		if (connectionFactories.size() == 0) {
 			throw new CassandraOperationException("No connection factories defined");
 		}
@@ -63,6 +68,7 @@ public class ConnectionPool {
 		if (connection == null) {
 			throw new CassandraOperationException("Timed out waiting for connection");
 		}
+		logger.debug("Connection established: " + connection.getHost());
 		return connection;
 	}
 	
@@ -93,11 +99,17 @@ public class ConnectionPool {
 	}
 
 	public void releaseConnection(Connection connection) {
+		if (connection == null) {
+			logger.debug("Attempting to release a null connection?  WTF!");
+			return;
+		}
+		logger.debug("Attempting to release connection back to the pool: " + connection.getHost());
 		if (connection.isOpen()) {
 			connection.closeConnection();
 		}
 		
 		Map<Connection, Boolean> targetHostPool = pool.get(connection.getHost());
 		targetHostPool.put(connection, true);
+		logger.debug("Connection closed and returned to pool successfully");
 	}
 }

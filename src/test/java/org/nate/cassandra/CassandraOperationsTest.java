@@ -106,6 +106,12 @@ public class CassandraOperationsTest {
 		Assert.assertNull(resultObject.getAnUnannotatedField());
 	}
 	
+	@Test
+	public void testF_A_RetrieveNotExists() throws Exception {			
+		StandardColumnTestClass resultObject = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, "unknownKey");
+		Assert.assertNull(resultObject);
+	}
+	
 	@Test(expected=CassandraOperationException.class)
 	public void testF2_InsertObject_NullKey() throws Exception {		
 		StandardColumnTestClass testObject = new StandardColumnTestClass();	
@@ -138,7 +144,7 @@ public class CassandraOperationsTest {
 	
 	@Test
 	public void testI_GetAll() throws Exception {
-		List<StandardColumnTestClass> results = (List<StandardColumnTestClass>) cassandra.getAll(StandardColumnTestClass.class);
+		List<Object> results = cassandra.getAll(StandardColumnTestClass.class);
 		Assert.assertNotNull(results);
 		Assert.assertEquals(1, results.size());
 	}
