@@ -1,6 +1,5 @@
 package org.nate.cassandra;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -77,7 +76,7 @@ public class CassandraOperationsTest {
 	public void testF_InsertObjectNotColumnFamily() {
 		IncorrectlyAnnotatedStandardColumnTestClass failObject = new IncorrectlyAnnotatedStandardColumnTestClass();
 		try {
-			cassandra.insert(IncorrectlyAnnotatedStandardColumnTestClass.class, failObject);
+			cassandra.insert(failObject);
 			Assert.fail("CassandraOperationException expected");
 		} catch (Exception e) {
 			Assert.assertTrue(e instanceof CassandraOperationException);
@@ -95,7 +94,7 @@ public class CassandraOperationsTest {
 		int intValue = 2;
 		testObject.setAnIntegerColumn(intValue);
 		testObject.setAnUnannotatedField("unannotated!");
-		cassandra.insert(StandardColumnTestClass.class, testObject);
+		cassandra.insert(testObject);
 		
 		String resultString = cassandra.getColumnValue("Standard1", key, "aStringColumn");
 		Assert.assertEquals(value, resultString);
@@ -110,7 +109,7 @@ public class CassandraOperationsTest {
 	@Test(expected=CassandraOperationException.class)
 	public void testF2_InsertObject_NullKey() throws Exception {		
 		StandardColumnTestClass testObject = new StandardColumnTestClass();	
-		cassandra.insert(StandardColumnTestClass.class, testObject);	
+		cassandra.insert(testObject);	
 	}
 	
 	@Test
@@ -138,14 +137,13 @@ public class CassandraOperationsTest {
 	}
 	
 	@Test
-	public void testI_CleanUpTheMess() throws Exception {		
-		StandardColumnTestClass result = (StandardColumnTestClass) cassandra.get(StandardColumnTestClass.class, "objectKey");
-
+	public void testI_CleanUpTheMess_1() throws Exception {		
 		cassandra.remove(StandardColumnTestClass.class, "objectKey");
 		int afterDeleteCount = cassandra.count(STANDARD_1_COLUMN_FAMILY, "objectKey");
 		
 		Assert.assertEquals(0, afterDeleteCount);
 	}
+	
 	
 	public class IncorrectlyAnnotatedStandardColumnTestClass {
 		

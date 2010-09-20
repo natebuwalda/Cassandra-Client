@@ -1,9 +1,6 @@
 package org.nate.cassandra;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,13 +14,9 @@ import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.apache.cassandra.thrift.Mutation;
 import org.apache.cassandra.thrift.NotFoundException;
 import org.apache.cassandra.thrift.SlicePredicate;
-import org.apache.cassandra.thrift.SliceRange;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nate.cassandra.annotation.ColumnFamily;
-import org.nate.cassandra.annotation.Key;
-import org.nate.cassandra.connector.Connection;
 import org.nate.cassandra.connector.ConnectionPool;
 import org.nate.functions.functors.FilterFn;
 import org.nate.functions.functors.ListFunctions;
@@ -38,17 +31,17 @@ public class CassandraOperations implements Cassandra {
 
 	private static final char SPACE_SEPARATOR = ' ';
 	private static final Log log = LogFactory.getLog(CassandraOperations.class);
-	
-	private static ConnectionPool connectionPool;
-	
+	private CassandraOperationUtils opUtils = new CassandraOperationUtils();
+	private OperationWorker worker = new OperationWorker(this);
+
+	private ConnectionPool connectionPool;
 	private Client client;
 	private String keyspaceName = "Keyspace1";
-
-
+	
 	public int count(final String columnFamily, final String key) throws CassandraOperationException {
-		return OperationWorker.doWork(new Operation<Integer>() {
+		return worker.doWork(new Operation<Integer>(this) {
 			public Integer work() throws Exception {
-				SlicePredicate slicePredicate = createSlicePredicate();
+				SlicePredicate slicePredicate = opUtils.createEmptySlicePredicate();
 				
 				List<ColumnOrSuperColumn> sliceResults = client.get_slice(keyspaceName, key, new ColumnParent(columnFamily), slicePredicate, ConsistencyLevel.ONE);
 	
@@ -57,12 +50,11 @@ public class CassandraOperations implements Cassandra {
 		});
 	}
 
-
 	public String describe() throws CassandraOperationException {
 		StringBuilder keyspaceDescription = new StringBuilder(keyspaceName);
 		keyspaceDescription.append("{\n");
 		
-		keyspaceDescription.append(OperationWorker.doWork(new Operation<StringBuilder>() {
+		keyspaceDescription.append(worker.doWork(new Operation<StringBuilder>(this) {
 			public StringBuilder work() throws Exception {
 				StringBuilder innerDescription = new StringBuilder();
 				Map<String, Map<String, String>> keyspaceRepresentationMap = client.describe_keyspace(keyspaceName);
@@ -85,18 +77,18 @@ public class CassandraOperations implements Cassandra {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public Object get(final Class clazz, final String key) throws CassandraOperationException {
-		return OperationWorker.doWork(new Operation<Object>() {
+		return worker.doWork(new Operation<Object>(this) {
 			public Object work() throws Exception {
 				final Object result = clazz.getConstructor(new Class[]{}).newInstance(new Object[]{});
 				
 				if (clazz.isAnnotationPresent(ColumnFamily.class)) {
-					String columnFamilyName = determineColumnFamily(clazz); 
-					SlicePredicate slicePredicate = createSlicePredicate();
+					String columnFamilyName = opUtils.determineColumnFamily(clazz); 
+					SlicePredicate slicePredicate = opUtils.createEmptySlicePredicate();
 					
 					final List<ColumnOrSuperColumn> sliceResults = client.get_slice(keyspaceName, key, new ColumnParent(columnFamilyName), slicePredicate, ConsistencyLevel.ONE);			
 
 					List<Field> declaredFields = Lists.newArrayList(clazz.getDeclaredFields());				
-					Option<Field> keyFieldOption = keyFieldFor(declaredFields);
+					Option<Field> keyFieldOption = opUtils.keyFieldFor(declaredFields);
 					keyFieldOption.get().setAccessible(true);
 					keyFieldOption.get().set(result, key);
 									
@@ -108,7 +100,7 @@ public class CassandraOperations implements Cassandra {
 							}							
 						});
 						if (columnOption.isSome()) {
-							field.set(result, convertStringToValue(new String(columnOption.get().getColumn().getValue()), field.getType()));
+							field.set(result, opUtils.convertStringToValue(new String(columnOption.get().getColumn().getValue()), field.getType()));
 						}
 					}
 				
@@ -119,11 +111,12 @@ public class CassandraOperations implements Cassandra {
 			}}); 
 	}
 
+
 	public String getColumnValue(final String columnFamily, final String key, final String column) throws CassandraOperationException {
-		return OperationWorker.doWork(new Operation<String>(){
+		return worker.doWork(new Operation<String>(this){
 			public String work() throws Exception {
 				try {
-					ColumnPath columnPath = createColumnPath(columnFamily, column.getBytes());
+					ColumnPath columnPath = opUtils.createColumnPath(columnFamily, column.getBytes());
 					Column resultColumn = client.get(keyspaceName, key, columnPath, ConsistencyLevel.ONE).getColumn();		
 					return new String(resultColumn.value);
 				} catch (NotFoundException nfe) {
@@ -135,18 +128,23 @@ public class CassandraOperations implements Cassandra {
 	}
 
 
-	public void insert(final Class<? extends Object> clazz, final Object insertObject) throws CassandraOperationException {
+	public ConnectionPool getConnectionPool() {
+		return connectionPool;
+	}
+
+	public void insert(final Object insertObject) throws CassandraOperationException {
 		if (insertObject == null) {
 			throw new IllegalArgumentException("Object to be inserted cannot be null");
 		}
 		
-		OperationWorker.doWork(new Operation<Void>() {
+		worker.doWork(new Operation<Void>(this) {
 			public Void work() throws Exception {
+				final Class clazz = insertObject.getClass();
 				if (clazz.isAnnotationPresent(ColumnFamily.class)) {
-					final String columnFamilyName = determineColumnFamily(clazz);
+					final String columnFamilyName = opUtils.determineColumnFamily(clazz);
 					
 					final List<Field> declaredFields = Lists.newArrayList(clazz.getDeclaredFields());	
-					Option<Field> keyFieldOption = keyFieldFor(declaredFields);
+					Option<Field> keyFieldOption = opUtils.keyFieldFor(declaredFields);
 					keyFieldOption.get().setAccessible(true);
 					final Object key = keyFieldOption.get().get(insertObject);
 					
@@ -158,8 +156,8 @@ public class CassandraOperations implements Cassandra {
 								field.setAccessible(true);
 								Object fieldValue = field.get(insertObject);
 								if (fieldValue != null) {	
-									ColumnPath columnPath = createColumnPath(columnFamilyName, determineColumnName(field).getBytes());
-									client.insert(keyspaceName, convertValueToString(key), columnPath, convertValueToString(fieldValue).getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
+									ColumnPath columnPath = opUtils.createColumnPath(columnFamilyName, opUtils.determineColumnName(field).getBytes());
+									client.insert(keyspaceName, opUtils.convertValueToString(key), columnPath, opUtils.convertValueToString(fieldValue).getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
 								}
 							}
 						}
@@ -173,11 +171,10 @@ public class CassandraOperations implements Cassandra {
 		});
 	}
 
-
 	public void insertColumnValue(final String columnFamily, final String key, final String column, final String value) throws CassandraOperationException {
-		OperationWorker.doWork(new Operation<Void>(){
+		worker.doWork(new Operation<Void>(this){
 			public Void work() throws Exception {
-				ColumnPath columnPath = createColumnPath(columnFamily, column.getBytes());
+				ColumnPath columnPath = opUtils.createColumnPath(columnFamily, column.getBytes());
 				client.insert(keyspaceName, key, columnPath, value.getBytes(), System.currentTimeMillis(), ConsistencyLevel.ANY);
 				return null;
 			}
@@ -185,17 +182,18 @@ public class CassandraOperations implements Cassandra {
 	}
 
 
+
 	public void remove(final Class<? extends Object> clazz, final String key) throws CassandraOperationException {
-		OperationWorker.doWork(new Operation<Void>(){
+		worker.doWork(new Operation<Void>(this){
 			public Void work() throws Exception {
 				if (clazz.isAnnotationPresent(ColumnFamily.class)) {
-					final String columnFamilyName = determineColumnFamily(clazz);
-					SlicePredicate slicePredicate = createSlicePredicate();
+					final String columnFamilyName = opUtils.determineColumnFamily(clazz);
+					SlicePredicate slicePredicate = opUtils.createEmptySlicePredicate();
 					
 					List<ColumnOrSuperColumn> sliceResults = Lists.newArrayList(client.get_slice(keyspaceName, key, new ColumnParent(columnFamilyName), slicePredicate, ConsistencyLevel.ONE));
 					
 					for (ColumnOrSuperColumn it : sliceResults) {
-						ColumnPath columnPath = createColumnPath(columnFamilyName, it.getColumn().getName());
+						ColumnPath columnPath = opUtils.createColumnPath(columnFamilyName, it.getColumn().getName());
 						client.remove(keyspaceName, key, columnPath, System.currentTimeMillis(), ConsistencyLevel.ALL);			
 					}
 				}
@@ -205,7 +203,7 @@ public class CassandraOperations implements Cassandra {
 	}
 
 	public void removeColumnValue(final String columnFamily, final String key, final String column) throws CassandraOperationException {
-		OperationWorker.doWork(new Operation<Void>(){
+		worker.doWork(new Operation<Void>(this){
 			public Void work() throws Exception {
 				ColumnPath columnPath = new ColumnPath();
 				columnPath.setColumn(column.getBytes());
@@ -216,8 +214,16 @@ public class CassandraOperations implements Cassandra {
 		}); 
 	}
 
+	public void setConnectionPool(ConnectionPool connectionPool) {
+		this.connectionPool = connectionPool;
+	}
+
 	public void setKeyspaceName(String keyspaceName) {
 		this.keyspaceName = keyspaceName;
+	}
+
+	public String getKeyspaceName() {
+		return keyspaceName;
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -226,14 +232,14 @@ public class CassandraOperations implements Cassandra {
 			throw new IllegalArgumentException("Object to be updated cannot be null");
 		}
 		
-		OperationWorker.doWork(new Operation<Void>(){
+		worker.doWork(new Operation<Void>(this){
 			public Void work() throws Exception {
 				final Class updatedObjectsClass = updateObject.getClass();
 				if (updatedObjectsClass.isAnnotationPresent(ColumnFamily.class)) {
-					String columnFamilyName = determineColumnFamily(updatedObjectsClass); 
+					String columnFamilyName = opUtils.determineColumnFamily(updatedObjectsClass); 
 					
 					final List<Field> declaredFields = Lists.newArrayList(updatedObjectsClass.getDeclaredFields());	
-					Option<Field> keyFieldOption = keyFieldFor(declaredFields);
+					Option<Field> keyFieldOption = opUtils.keyFieldFor(declaredFields);
 					keyFieldOption.get().setAccessible(true);
 					final Object key = keyFieldOption.get().get(updateObject);
 					
@@ -248,7 +254,7 @@ public class CassandraOperations implements Cassandra {
 										mutation = new Mutation();
 										field.setAccessible(true);
 										Object fieldValue = field.get(updateObject);
-										Column column = createColumnObject(field, fieldValue);
+										Column column = opUtils.createColumnObject(field, fieldValue);
 										
 										ColumnOrSuperColumn columnOrSuper = new ColumnOrSuperColumn();
 										columnOrSuper.setColumn(column);
@@ -272,7 +278,7 @@ public class CassandraOperations implements Cassandra {
 						columnFamilyUpdates.put(columnFamilyName, filteredMutations);
 						
 						Map<String, Map<String, List<Mutation>>> rowUpdates = new HashMap<String, Map<String, List<Mutation>>>();
-						rowUpdates.put(convertValueToString(key), columnFamilyUpdates);
+						rowUpdates.put(opUtils.convertValueToString(key), columnFamilyUpdates);
 						
 						client.batch_mutate(keyspaceName, rowUpdates, ConsistencyLevel.ALL);
 					} 
@@ -281,139 +287,10 @@ public class CassandraOperations implements Cassandra {
 			}}); 
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" }) 
-	private Object convertStringToValue(String string, Class fieldType) throws IllegalArgumentException, SecurityException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-		Object converted = null;
-		
-		if ("String".equals(fieldType.getSimpleName())) {
-			converted = string;
-		} else if ("byte[]".equals(fieldType.getSimpleName())) {
-			converted = string.getBytes();
-		} else if (StringUtils.isNumeric(string)) {
-			converted = fieldType.getConstructor(new Class[]{String.class}).newInstance(new Object[]{string});
-		}
-		
-		return converted;
-	}
-
-	private String convertValueToString(Object value) {
-		String converted = null;
-		if (value instanceof String) {
-			converted = (String) value;
-		} else if (value instanceof byte[]) {
-			converted = new String((byte[]) value);
-		} else if (value instanceof Number){
-			converted = ((Number) value).toString();
-		} else {
-			throw new IllegalArgumentException("Value must be a String or a Number, was " + value.toString());
-		}
-		return converted;
-	}
-
-	private Column createColumnObject(Field field, Object fieldValue) {
-		Column column = new Column();
-		column.setName(field.getName().getBytes());
-		column.setValue(convertValueToString(fieldValue).getBytes());
-		column.setTimestamp(System.currentTimeMillis());
-		return column;
-	}
-
-	private ColumnPath createColumnPath(final String columnFamilyName, byte[] columnName) {
-		ColumnPath columnPath = new ColumnPath();
-		columnPath.setColumn(columnName);
-		columnPath.setColumn_family(columnFamilyName);
-		return columnPath;
-	}
-
-	private SlicePredicate createSlicePredicate() {
-		SlicePredicate slicePredicate = new SlicePredicate();
-		SliceRange sliceRange = new SliceRange();
-		sliceRange.setStart(new byte[] {});
-		sliceRange.setFinish(new byte[] {});
-		slicePredicate.setSlice_range(sliceRange);
-		return slicePredicate;
-	}
-
-	private String determineColumnFamily(Class<? extends Object> clazz) throws IllegalAccessException,
-			InvocationTargetException {
-		String columnFamilyName = null;
-		try {
-			Annotation runtimeAnnotation = clazz.getAnnotation(ColumnFamily.class);
-			if (runtimeAnnotation != null) {
-				Method nameMethod = ((Class<? extends Annotation>) runtimeAnnotation.getClass()).getMethod("name", new Class<?>[]{});
-				columnFamilyName  = (String) nameMethod.invoke(runtimeAnnotation, new Object[]{});
-			}
-		} catch (NoSuchMethodException nsme) {
-			//eat this exception because we do not care
-		}
-		
-		if (columnFamilyName  == null || columnFamilyName.isEmpty()) {
-			columnFamilyName  = clazz.getSimpleName();
-		}
-		return columnFamilyName;
-	}
-
-
-	private String determineColumnName(Field field) throws IllegalAccessException, InvocationTargetException {
-		String columnName = null;
-		
-		try {
-			Annotation runtimeAnnotation = field.getAnnotation(org.nate.cassandra.annotation.Column.class);
-			if (runtimeAnnotation != null) {
-				Method nameMethod = ((Class<? extends Annotation>) runtimeAnnotation.getClass()).getMethod("name", new Class<?>[]{});
-				columnName = (String) nameMethod.invoke(runtimeAnnotation, new Object[]{});
-			}
-		} catch (NoSuchMethodException nsme) {
-			//eat this exception because we do not care
-		}
-		
-		if (columnName == null || columnName.isEmpty()) {
-			columnName = field.getName();
-		} 
-		return columnName;
-	}
-
-
-	public ConnectionPool getConnectionPool() {
-		return connectionPool;
-	}
-
-
-	public void setConnectionPool(ConnectionPool connectionPool) {
-		this.connectionPool = connectionPool;
-	}
-
-
-	private Option<Field> keyFieldFor(List<Field> declaredFields) {
-		Option<Field> keyFieldOption = ListFunctions.find(declaredFields, new FilterFn<Field>(){
-			public boolean apply(Field it) {
-				return it.isAnnotationPresent(Key.class);
-			}	
-		});
-		return keyFieldOption;
-	}
-
-	private abstract class Operation<T> {
-		public Client client;
-		public abstract T work() throws Exception;
-		
+	
+	public Client getClient() {
+		return this.client;
 	}
 	
-	private static class OperationWorker {
-		
-		public static <T> T doWork(Operation<T> operation) {
-			Connection connection = null;
-			try {
-				connection = connectionPool.getConnection();
-				operation.client = connection.getClient();
-				T result = operation.work();
-				return result;
-			} catch (Exception e) {
-				throw new CassandraOperationException("Unable to perform operation", e);
-			} finally {
-				connectionPool.releaseConnection(connection);
-			}
-
-		}
-	}
+	
 }

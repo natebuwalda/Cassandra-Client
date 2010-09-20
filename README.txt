@@ -9,11 +9,20 @@ Available functionality:
 - Single column operations for modification of distinct values
 - Keyspace description
 - Basic random host connection pooling
+- Querying for columns
 
 Under development functionality:
 - CRUD operations for SuperColumns
-- Querying
+- Querying for super columns
 
 Future plans:
 - Pseudo-transactionality
 - Better multiple host failover and connection pooling
+
+Caveats:
+- Though you can configure multiple hosts, the client really only works against one host for now.
+  More support for multi-node rings is coming.  For now though, use only one host for best results.
+   
+Release Notes
+=============
+Still in alpha... 
