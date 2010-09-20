@@ -4,31 +4,32 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import com.sun.corba.se.impl.io.FVDCodeBaseImpl;
+import org.nate.functions.options.Option;
+
+import com.google.common.collect.Lists;
 
 public class ResultSet<T> { 
 
 	public List<T> results = new ArrayList<T>();
+	private CassandraOperationUtils opUtils = new CassandraOperationUtils();
 	
-	public ResultSet<T> or(ResultSet<T> other) {
+	public ResultSet<T> or(ResultSet<T> other) throws IllegalArgumentException, IllegalAccessException {
 		ResultSet<T> sumSet = new ResultSet<T>();
 		sumSet.results.addAll(this.results);
-		for (T otherResult : other.results) {
-			if (!this.results.contains(otherResult)) {
+		for (T otherResult : other.results) {			
+			if (!matchedKeyValues(otherResult)) {
 				sumSet.results.add(otherResult);
 			}
 		}
 		return sumSet;
 	}
 	
-	public ResultSet<T> and(ResultSet<T> other) {
+	public ResultSet<T> and(ResultSet<T> other) throws IllegalArgumentException, IllegalAccessException {
 		ResultSet<T> sumSet = new ResultSet<T>();
 		for (T otherResult : other.results) {
-			if (this.results.contains(otherResult)) {
+			if (matchedKeyValues(otherResult)) {
 				sumSet.results.add(otherResult);
 			}
 		}
@@ -63,6 +64,26 @@ public class ResultSet<T> {
 			throw new CassandraOperationException("Unable to sort result set descending", e);
 		}
 		return sortedResultSet;
+	}
+	
+	private boolean matchedKeyValues(T otherResult) throws IllegalArgumentException, IllegalAccessException {
+		boolean found = false;
+		Option<Field> otherKeyOption = opUtils.keyFieldFor(Lists.newArrayList(otherResult.getClass().getDeclaredFields()));
+		if (otherKeyOption.isSome()) {
+			for (T thisResult : this.results) {
+				Option<Field> thisKeyOption = opUtils.keyFieldFor(Lists.newArrayList(thisResult.getClass().getDeclaredFields()));
+				if (thisKeyOption.isSome()) {
+					otherKeyOption.get().setAccessible(true);
+					thisKeyOption.get().setAccessible(true);
+					if (thisKeyOption.get().get(thisResult).equals(otherKeyOption.get().get(otherResult))) {
+						found = true;
+					}
+				}
+			}
+		} else {
+			throw new IllegalArgumentException("The objects you are trying to perform operations on do not have keys");
+		}
+		return found;
 	}
 	
 	private abstract class Sorter implements Comparator<T> {

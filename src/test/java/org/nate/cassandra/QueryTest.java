@@ -173,6 +173,35 @@ public class QueryTest {
 	}
 	
 	@Test
+	public void testK_twoQueriesSingleArgs_or() throws Exception {
+		List<StandardColumnTestClass> results = query.execute(StandardColumnTestClass.class, 
+														new Triplet("aStringColumn", QueryConditional.EQUAL, "AAAAA"))
+														.or(query.execute(StandardColumnTestClass.class, 
+																new Triplet("anIntegerColumn", QueryConditional.EQUAL, "30")))
+														.results;
+		Assert.assertEquals(2, results.size());
+		Assert.assertEquals(firstObject.getKey(), results.get(0).getKey());
+		Assert.assertEquals(firstObject.getAnIntegerColumn(), results.get(0).getAnIntegerColumn());
+		Assert.assertEquals(firstObject.getAStringColumn(), results.get(0).getAStringColumn());
+		Assert.assertEquals(thirdObject.getKey(), results.get(1).getKey());
+		Assert.assertEquals(thirdObject.getAnIntegerColumn(), results.get(1).getAnIntegerColumn());
+		Assert.assertEquals(thirdObject.getAStringColumn(), results.get(1).getAStringColumn());
+	}
+	
+	@Test
+	public void testK_twoQueriesSingleArgs_and() throws Exception {
+		List<StandardColumnTestClass> results = query.execute(StandardColumnTestClass.class, 
+														new Triplet("aStringColumn", QueryConditional.EQUAL, "AAAAA"))
+														.and(query.execute(StandardColumnTestClass.class, 
+																new Triplet("anIntegerColumn", QueryConditional.GREATER_THAN_EQUAL_TO, "10")))
+														.results;
+		Assert.assertEquals(1, results.size());
+		Assert.assertEquals(firstObject.getKey(), results.get(0).getKey());
+		Assert.assertEquals(firstObject.getAnIntegerColumn(), results.get(0).getAnIntegerColumn());
+		Assert.assertEquals(firstObject.getAStringColumn(), results.get(0).getAStringColumn());
+	}
+	
+	@Test
 	public void testK_CleanUpTheMess() throws Exception {		
 		cassandra.remove(StandardColumnTestClass.class, "firstKey");
 		cassandra.remove(StandardColumnTestClass.class, "secondKey");
