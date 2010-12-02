@@ -25,4 +25,4 @@ Caveats:
    
 Release Notes
 =============
-Still in alpha... 
+Still in alpha... more in alpha
